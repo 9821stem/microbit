@@ -1,5 +1,13 @@
-<button id="startButton">Start Camera + micro:bit</button>
-<div id="status"></div>
+<body>
+  <button id="startButton">Start Camera + micro:bit</button>
+  <div id="status"></div>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Micro:bit + TM</title>
+  <!-- Teachable Machine library -->
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+</head>
 
 <script>
 let model, webcam, port, writer;
@@ -64,3 +72,4 @@ async function loop() {
 }
 </script>
 
+</body>
