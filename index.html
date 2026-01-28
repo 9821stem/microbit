@@ -5,8 +5,8 @@
 let model, webcam, port, writer;
 
 // Replace these with your actual Teachable Machine model URLs
-const modelURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/";
-const metadataURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/";
+const modelURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/model.json";
+const metadataURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/metadata.json";
 
 // Button click starts everything
 document.getElementById("startButton").onclick = async function() {
@@ -63,3 +63,4 @@ async function loop() {
   window.requestAnimationFrame(loop);
 }
 </script>
+
