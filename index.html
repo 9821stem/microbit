@@ -1,54 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>TM + micro:bit</title>
+  <meta charset="UTF-8">
+  <title>Micro:bit + Teachable Machine</title>
+  <!-- Teachable Machine Image Library -->
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 20px; }
+    #status { margin-top: 10px; font-weight: bold; }
+    canvas { margin-top: 10px; }
+    button { font-size: 18px; padding: 10px 20px; }
+  </style>
 </head>
 <body>
-  <button onclick="connect()">Connect micro:bit</button>
-  <div id="label"></div>
+  <h1>Micro:bit + Teachable Machine</h1>
+  <button id="startButton">Start Camera + micro:bit</button>
+  <div id="status"></div>
 
-<script>
-let model, webcam, port, writer;
-const modelURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/model.json";
-const metadataURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/metadata.json";
+  <script>
+  let model, webcam, port, writer;
 
-async function connect() {
-  // Load model
-  model = await tmImage.load(modelURL, metadataURL);
+  // Your Teachable Machine model URLs
+  const modelURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/model.json";
+  const metadataURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/metadata.json";
 
-  // Webcam
-  webcam = new tmImage.Webcam(200, 200, true);
-  await webcam.setup();
-  await webcam.play();
-  window.requestAnimationFrame(loop);
+  document.getElementById("startButton").onclick = async function() {
+    const status = document.getElementById("status");
+    status.innerText = "Starting...";
 
-  // Connect micro:bit
-  port = await navigator.serial.requestPort();
-  await port.open({ baudRate: 115200 });
-  writer = port.writable.getWriter();
-}
+    try {
+      // Wait until tmImage is fully loaded
+      await new Promise(resolve => {
+        if (tmImage && tmImage.Webcam) resolve();
+        else {
+          const interval = setInterval(() => {
+            if (tmImage && tmImage.Webcam) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 50);
+        }
+      });
 
-async function loop() {
-  webcam.update();
-  await predict();
-  requestAnimationFrame(loop);
-}
+      // 1️⃣ Setup the webcam
+      webcam = new tmImage.Webcam(200, 200, true);
+      await webcam.setup();   // Chrome will ask for camera permission
+      await webcam.play();
+      document.body.appendChild(webcam.canvas);
 
-async function predict() {
-  const prediction = await model.predict(webcam.canvas);
-  let best = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
+      // 2️⃣ Load the Teachable Machine model
+      model = await tmImage.load(modelURL, metadataURL);
 
-  document.getElementById("label").innerText =
-    best.className + ": " + best.probability.toFixed(2);
+      // 3️⃣ Connect to micro:bit via WebUSB/Serial
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      writer = port.writable.getWriter();
 
-  if (best.className === "A") {
-    await writer.write(new TextEncoder().encode("A\n"));
-  } 
-  else if (best.className === "B") {
-    await writer.write(new TextEncoder().encode("B\n"));
+      status.innerText = "Running";
+
+      // 4️⃣ Start the prediction loop
+      window.requestAnimationFrame(loop);
+
+    } catch (err) {
+      console.error(err);
+      status.innerText = "Error: " + err;
+    }
   }
-}
-</script>
+
+  // Prediction loop
+  async function loop() {
+    webcam.update();
+    const predictions = await model.predict(webcam.canvas);
+
+    // Find the class with the highest probability
+    const best = predictions.reduce((a, b) =>
+      a.probability > b.probability ? a : b
+    );
+
+    // Send result to micro:bit
+    if (best.className === "A") await writer.write(new TextEncoder().encode("A\n"));
+    else if (best.className === "B") await writer.write(new TextEncoder().encode("B\n"));
+
+    window.requestAnimationFrame(loop);
+  }
+  </script>
 </body>
 </html>
