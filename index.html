@@ -1,58 +1,65 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>TM + micro:bit</title>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
-</head>
-<body>
-  <button onclick="connect()">Connect micro:bit</button>
-  <div id="label"></div>
+<button id="startButton">Start Camera + micro:bit</button>
+<div id="status"></div>
 
 <script>
-  alert("JavaScript is running!");
-console.log("Script loaded");
-
 let model, webcam, port, writer;
+
+// Replace these with your actual Teachable Machine model URLs
 const modelURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/";
 const metadataURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/";
 
-async function connect() {
-  // Load model
-  model = await tmImage.load(modelURL, metadataURL);
+// Button click starts everything
+document.getElementById("startButton").onclick = async function() {
+  const status = document.getElementById("status");
+  status.innerText = "Starting...";
 
-  // Webcam
-  webcam = new tmImage.Webcam(200, 200, true);
-  await webcam.setup();
-  await webcam.play();
-  window.requestAnimationFrame(loop);
+  try {
+    // 1️⃣ Setup the webcam
+    webcam = new tmImage.Webcam(200, 200, true);
+    await webcam.setup();   // Chrome will ask for camera permission
+    await webcam.play();
+    document.body.appendChild(webcam.canvas);
 
-  // Connect micro:bit
-  port = await navigator.serial.requestPort();
-  await port.open({ baudRate: 115200 });
-  writer = port.writable.getWriter();
-}
+    // 2️⃣ Load the model
+    model = await tmImage.load(modelURL, metadataURL);
 
-async function loop() {
-  webcam.update();
-  await predict();
-  requestAnimationFrame(loop);
-}
+    // 3️⃣ Connect to micro:bit via WebUSB / Serial
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    writer = port.writable.getWriter();
 
-async function predict() {
-  const prediction = await model.predict(webcam.canvas);
-  let best = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
+    status.innerText = "Running";
 
-  document.getElementById("label").innerText =
-    best.className + ": " + best.probability.toFixed(2);
+    // 4️⃣ Start the prediction loop
+    window.requestAnimationFrame(loop);
 
-  if (best.className === "A") {
-    await writer.write(new TextEncoder().encode("A\n"));
-  } 
-  else if (best.className === "B") {
-    await writer.write(new TextEncoder().encode("B\n"));
+  } catch (err) {
+    console.error(err);
+    status.innerText = "Error: " + err;
   }
 }
-</script>
-</body>
-</html>
 
+// Prediction loop
+async function loop() {
+  // Update the webcam
+  webcam.update();
+
+  // Make a prediction
+  const predictions = await model.predict(webcam.canvas);
+
+  // Find the class with highest probability
+  const best = predictions.reduce((a, b) =>
+    a.probability > b.probability ? a : b
+  );
+
+  // Send the result to micro:bit
+  if (best.className === "A") {
+    await writer.write(new TextEncoder().encode("A\n"));
+  } else if (best.className === "B") {
+    await writer.write(new TextEncoder().encode("B\n"));
+  }
+
+  // Loop again
+  window.requestAnimationFrame(loop);
+}
+</script>
