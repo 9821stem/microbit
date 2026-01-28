@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TM + micro:bit</title>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+</head>
+<body>
+  <button onclick="connect()">Connect micro:bit</button>
+  <div id="label"></div>
+
+<script>
+let model, webcam, port, writer;
+const modelURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/";
+const metadataURL = "https://teachablemachine.withgoogle.com/models/Znxs4Qv-h/";
+
+async function connect() {
+  // Load model
+  model = await tmImage.load(modelURL, metadataURL);
+
+  // Webcam
+  webcam = new tmImage.Webcam(200, 200, true);
+  await webcam.setup();
+  await webcam.play();
+  window.requestAnimationFrame(loop);
+
+  // Connect micro:bit
+  port = await navigator.serial.requestPort();
+  await port.open({ baudRate: 115200 });
+  writer = port.writable.getWriter();
+}
+
+async function loop() {
+  webcam.update();
+  await predict();
+  requestAnimationFrame(loop);
+}
+
+async function predict() {
+  const prediction = await model.predict(webcam.canvas);
+  let best = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
+
+  document.getElementById("label").innerText =
+    best.className + ": " + best.probability.toFixed(2);
+
+  if (best.className === "A") {
+    await writer.write(new TextEncoder().encode("A\n"));
+  } 
+  else if (best.className === "B") {
+    await writer.write(new TextEncoder().encode("B\n"));
+  }
+}
+</script>
+</body>
+</html>
